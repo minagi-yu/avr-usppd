@@ -3,6 +3,8 @@ ATPACK = /home/minagi/Downloads/AVR-Dx_DFP
 
 DEFS = F_CPU=24000000
 
+COMPORT = /dev/ttyS3
+
 PROJECT := $(shell basename `pwd`)
 
 SRCDIR = src
@@ -46,5 +48,12 @@ $(OBJS) : $(OBJDIR)/%.o : $(SRCDIR)/%.c
 
 clean:
 	@rm -fr $(OBJDIR)
+
+ping:
+	@pymcuprog ping -d $(DEVICE) -t uart -u $(COMPORT)
+
+program:
+	@pymcuprog erase -d $(DEVICE) -t uart -u $(COMPORT)
+	@pymcuprog write -f $(PROJECT).hex -d $(DEVICE) -t uart -u $(COMPORT)
 
 -include $(shell mkdir -p $(OBJDIR)) $(wildcard $(OBJDIR)/*.d)
