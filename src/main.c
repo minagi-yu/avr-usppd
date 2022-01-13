@@ -56,7 +56,7 @@ int main(void)
     // イベント2をEVOUTC(PC2)ピンへ出力（デバッグ用）
     EVSYS.USEREVSYSEVOUTC = EVSYS_USER_CHANNEL2_gc;
 
-    // CCL LUT1は常に0出力
+    // CCL LUT1（D-FFのゲート）は常に1出力
     CCL.TRUTH1 = 0xFF;
     CCL.LUT1CTRLC = CCL_INSEL2_MASK_gc;
     CCL.LUT1CTRLB = CCL_INSEL1_MASK_gc | CCL_INSEL0_MASK_gc;
