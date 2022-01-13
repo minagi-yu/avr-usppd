@@ -37,4 +37,34 @@ int main(void)
     TCB2.CNT = 38;
     TCB2.CCMP = 38;
     TCB2.CTRLA = TCB_ENABLE_bm;
+
+    // CCL LUTの0と1をD-FFに設定
+    CCL.SEQCTRL0 = CCL_SEQSEL_DFF_gc;
+
+    // CCL LUT0のEVENTAにEVENT0を接続
+    EVSYS.USERCCLLUT0A = EVSYS_USER_CHANNEL0_gc;
+    // CCL LUT0の入力0が1の時に出力が1（入力0のバッファ）（入力1, 2はDon't care）
+    CCL.TRUTH0 = 0xAA;
+    // CCL LUT0の入力2にTCB2出力
+    CCL.LUT0CTRLC = CCL_INSEL2_TCB2_gc;
+    // CCL LUT0の入力0にEVENTA
+    CCL.LUT0CTRLB = CCL_INSEL1_MASK_gc | CCL_INSEL0_EVENTA_gc;
+    // CCL LUT0のクロック（D-FFのクロック）は入力2（TCB2出力）
+    CCL.LUT0CTRLA = CCL_CLKSRC_IN2_gc | CCL_ENABLE_bm;
+    // EVEVT2をCCL LUT0の出力（D-FFの出力）に設定
+    EVSYS.CHANNEL2 = EVSYS_CHANNEL2_CCL_LUT0_gc;
+    // イベント2をEVOUTC(PC2)ピンへ出力（デバッグ用）
+    EVSYS.USEREVSYSEVOUTC = EVSYS_USER_CHANNEL2_gc;
+
+    // CCL LUT1は常に0出力
+    CCL.TRUTH1 = 0xFF;
+    CCL.LUT1CTRLC = CCL_INSEL2_MASK_gc;
+    CCL.LUT1CTRLB = CCL_INSEL1_MASK_gc | CCL_INSEL0_MASK_gc;
+    CCL.LUT1CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_ENABLE_bm;
+
+    CCL.CTRLA = CCL_ENABLE_bm;
+
+    for (;;) {
+    }
+
 }
