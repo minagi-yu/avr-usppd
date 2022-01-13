@@ -17,14 +17,24 @@ int main(void)
 
     // イベント0をTCB1の入力に設定
     EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL0_gc;
-    // TCB1を0.83usのワンショットに設定
+    // TCB1を0.83us(20クロック)のワンショットに設定
     // TCB1.CTRLB = TCB_ASYNC_bm | TCB_CNTMODE_SINGLE_gc;
     PORTA.DIRSET = PIN3_bm; // デバッグ用
     TCB1.CTRLB = TCB_ASYNC_bm | TCB_CCMPEN_bm | TCB_CNTMODE_SINGLE_gc; // PA3ピンに出力（デバッグ用）
     TCB1.EVCTRL = TCB_EDGE_bm | TCB_CAPTEI_bm;
-    TCB1.CNT = 18;
-    TCB1.CCMP = 18;
+    TCB1.CNT = 15;
+    TCB1.CCMP = 15;
     TCB1.CTRLA = TCB_ENABLE_bm;
     // イベント1をTCB1の出力に設定
     EVSYS.CHANNEL1 = EVSYS_CHANNEL1_TCB1_CAPT_gc;
+
+    // イベント1をTCB2の入力に設定
+    EVSYS.USERTCB2CAPT = EVSYS_USER_CHANNEL1_gc;
+    // TCB2を1.67us(40クロック)のワンショットに設定
+    PORTC.DIRSET = PIN0_bm;
+    TCB2.CTRLB = TCB_ASYNC_bm | TCB_CCMPEN_bm | TCB_CNTMODE_SINGLE_gc; // PC0ピンに出力
+    TCB2.EVCTRL = TCB_CAPTEI_bm;
+    TCB2.CNT = 38;
+    TCB2.CCMP = 38;
+    TCB2.CTRLA = TCB_ENABLE_bm;
 }
