@@ -1,4 +1,15 @@
+#include <avr/interrupt.h>
 #include <avr/io.h>
+#include <stdio.h>
+#include <util/delay.h>
+#include "uart.h"
+
+static int uart_putchar(char c, FILE *stream)
+{
+    uart_putc(c);
+    return 0;
+}
+static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL, _FDEV_SETUP_WRITE);
 
 int main(void)
 {
@@ -19,7 +30,7 @@ int main(void)
     EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL0_gc;
     // TCB1を0.83us(20クロック)のワンショットに設定
     // TCB1.CTRLB = TCB_ASYNC_bm | TCB_CNTMODE_SINGLE_gc;
-    PORTA.DIRSET = PIN3_bm; // デバッグ用
+    PORTA.DIRSET = PIN3_bm;                                            // デバッグ用
     TCB1.CTRLB = TCB_ASYNC_bm | TCB_CCMPEN_bm | TCB_CNTMODE_SINGLE_gc; // PA3ピンに出力（デバッグ用）
     TCB1.EVCTRL = TCB_EDGE_bm | TCB_CAPTEI_bm;
     TCB1.CNT = 15;
@@ -77,7 +88,11 @@ int main(void)
 
     CCL.CTRLA = CCL_ENABLE_bm;
 
-    for (;;) {
-    }
+    stdout = &mystdout;
+    uart_init();
 
+    for (;;) {
+        puts("Hello World");
+        _delay_ms(500);
+    }
 }
