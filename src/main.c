@@ -20,7 +20,7 @@ int main(void)
     VREF.ACREF = VREF_REFSEL_2V048_gc;
     AC0.MUXCTRL = AC_INITVAL_HIGH_gc | AC_MUXPOS_AINP0_gc | AC_MUXNEG_DACREF_gc;
     AC0.DACREF = 40; // Vth = 0.32v
-    AC0.CTRLA = AC_ENABLE_bm;
+    AC0.CTRLA = AC_HYSMODE_SMALL_gc | AC_ENABLE_bm;
     // イベント0にAC0の出力を接続
     EVSYS.CHANNEL0 = EVSYS_CHANNEL0_AC0_OUT_gc;
     // イベント0をEVOUTA(PA2)ピンに出力（デバッグ用）
@@ -45,8 +45,8 @@ int main(void)
     PORTC.DIRSET = PIN0_bm;
     TCB2.CTRLB = TCB_ASYNC_bm | TCB_CCMPEN_bm | TCB_CNTMODE_SINGLE_gc; // PC0ピンに出力
     TCB2.EVCTRL = TCB_CAPTEI_bm;
-    TCB2.CNT = 40;
-    TCB2.CCMP = 40;
+    TCB2.CNT = 42;
+    TCB2.CCMP = 42;
     TCB2.CTRLA = TCB_ENABLE_bm;
 
     // CCL LUTの0と1をD-FFに設定
@@ -88,11 +88,48 @@ int main(void)
 
     CCL.CTRLA = CCL_ENABLE_bm;
 
+    // 通信の終わり検知用タイマー
+    // イベント0をTCB0の入力に設定
+    EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL0_gc;
+    // 割り込み有効
+    TCB0.EVCTRL = TCB_CAPTEI_bm;
+    TCB0.INTCTRL = TCB_CAPT_bm;
+    // 1bitぶんの時間以上の適当な時間
+    TCB0.CCMP = 200;
+    // タイムアウトモード
+    TCB0.CTRLB = TCB_CNTMODE_TIMEOUT_gc;
+    TCB0.CTRLA = TCB_ENABLE_bm;
+
+    // SPIの設定
+    SPI0.CTRLA = SPI_ENABLE_bm;
+    SPI0.CTRLB = SPI_BUFEN_bm | SPI_MODE_1_gc;
+    SPI0.INTCTRL = SPI_RXCIE_bm | SPI_IE_bm;
+
     stdout = &mystdout;
     uart_init();
 
     for (;;) {
-        puts("Hello World");
-        _delay_ms(500);
+        // puts("Hello World");
+        // _delay_ms(500);
     }
+}
+
+ISR(SPI0_INT_vect)
+{
+    uint8_t d;
+
+    d = SPI0.DATA;
+    uart_putc(d);
+
+    SPI0.INTFLAGS = SPI_RXCIF_bm;
+}
+
+ISR(TCB0_INT_vect)
+{
+    // タイムアウト
+    // SPIの初期化
+    SPI0.CTRLA &= ~SPI_ENABLE_bm;
+    SPI0.CTRLA |= SPI_ENABLE_bm;
+
+    TCB0.INTFLAGS |= TCB_CAPT_bm;
 }

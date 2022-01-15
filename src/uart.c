@@ -4,7 +4,7 @@
 #include "fifo.h"
 
 #define UART_CLK_PER F_CPU
-#define UART_BAUD 115200
+#define UART_BAUD 460800
 
 #define UART_TX_PORT PORTA
 #define UART_TX_PIN 0
