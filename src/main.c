@@ -1,6 +1,7 @@
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <stdio.h>
+#include <string.h>
 #include <util/delay.h>
 #include "uart.h"
 
@@ -12,6 +13,24 @@ static int uart_putchar(char c, FILE *stream)
     return 0;
 }
 static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL, _FDEV_SETUP_WRITE);
+
+static void puthex(uint8_t val)
+{
+    uint8_t vh, vl;
+    vh = val >> 4;
+    vl = val & 0x0f;
+
+    if (vh > 9) {
+        uart_putc(vh - 10 + 'A');
+    } else {
+        uart_putc(vh + '0');
+    }
+    if (vl > 9) {
+        uart_putc(vl - 10 + 'A');
+    } else {
+        uart_putc(vl + '0');
+    }
+}
 
 int main(void)
 {
@@ -105,6 +124,7 @@ int main(void)
     // SPIの設定
     SPI0.CTRLA = SPI_ENABLE_bm;
     SPI0.CTRLB = SPI_BUFEN_bm | SPI_MODE_1_gc;
+    SPI0.CTRLA = SPI_ENABLE_bm;
     SPI0.INTCTRL = SPI_RXCIE_bm | SPI_IE_bm;
 
     PORTC.DIRSET = PIN1_bm; // SS（デバッグ用）
@@ -127,7 +147,7 @@ ISR(SPI0_INT_vect)
     uint8_t d;
 
     d = SPI0.DATA;
-    uart_putc(d);
+    puthex(d);
     len++;
 
     SPI0.INTFLAGS = SPI_RXCIF_bm;
@@ -145,7 +165,8 @@ ISR(TCB0_INT_vect)
             PORTC.PIN0CTRL = 0;
         } while (SPI0.INTFLAGS & SPI_RXCIF_bm);
         SPI0.INTFLAGS = SPI_RXCIF_bm;
-        uart_putc(SPI0.DATA);
+        puthex(SPI0.DATA);
+        uart_putc('\n');
     }
     // SPIの初期化
     SPI0.CTRLA &= ~SPI_ENABLE_bm;
