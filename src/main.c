@@ -107,6 +107,10 @@ int main(void)
     SPI0.CTRLB = SPI_BUFEN_bm | SPI_MODE_1_gc;
     SPI0.INTCTRL = SPI_RXCIE_bm | SPI_IE_bm;
 
+    PORTC.DIRSET = PIN1_bm; // SS（デバッグ用）
+    PORTC.OUTSET = PIN1_bm;
+    PORTC.OUTCLR = PIN1_bm;
+
     len = 0;
 
     stdout = &mystdout;
@@ -146,6 +150,8 @@ ISR(TCB0_INT_vect)
     // SPIの初期化
     SPI0.CTRLA &= ~SPI_ENABLE_bm;
     SPI0.CTRLA |= SPI_ENABLE_bm;
+    PORTC.OUTSET = PIN1_bm;
+    PORTC.OUTCLR = PIN1_bm;
     SPI0.INTCTRL = SPI_RXCIE_bm | SPI_IE_bm;
     len = 0;
 
