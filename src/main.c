@@ -4,6 +4,8 @@
 #include <util/delay.h>
 #include "uart.h"
 
+static uint16_t len;
+
 static int uart_putchar(char c, FILE *stream)
 {
     uart_putc(c);
@@ -105,6 +107,8 @@ int main(void)
     SPI0.CTRLB = SPI_BUFEN_bm | SPI_MODE_1_gc;
     SPI0.INTCTRL = SPI_RXCIE_bm | SPI_IE_bm;
 
+    len = 0;
+
     stdout = &mystdout;
     uart_init();
 
@@ -120,6 +124,7 @@ ISR(SPI0_INT_vect)
 
     d = SPI0.DATA;
     uart_putc(d);
+    len++;
 
     SPI0.INTFLAGS = SPI_RXCIF_bm;
 }
@@ -127,9 +132,22 @@ ISR(SPI0_INT_vect)
 ISR(TCB0_INT_vect)
 {
     // タイムアウト
+    if (len > 0) {
+        SPI0.INTCTRL = 0;
+        // 8ビットに満たない部分的データを受信
+        do {
+            // PC0(TCB2 OUT)はPA6(SPI0 SCK)に接続してあるのでSCKをトグル
+            PORTC.PIN0CTRL = PORT_INVEN_bm;
+            PORTC.PIN0CTRL = 0;
+        } while (SPI0.INTFLAGS & SPI_RXCIF_bm);
+        SPI0.INTFLAGS = SPI_RXCIF_bm;
+        uart_putc(SPI0.DATA);
+    }
     // SPIの初期化
     SPI0.CTRLA &= ~SPI_ENABLE_bm;
     SPI0.CTRLA |= SPI_ENABLE_bm;
+    SPI0.INTCTRL = SPI_RXCIE_bm | SPI_IE_bm;
+    len = 0;
 
     TCB0.INTFLAGS |= TCB_CAPT_bm;
 }
