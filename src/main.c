@@ -116,10 +116,10 @@ int main(void)
     TCB0.EVCTRL = TCB_CAPTEI_bm;
     TCB0.INTCTRL = TCB_CAPT_bm;
     // 1bitぶんの時間以上の適当な時間
-    TCB0.CCMP = 200;
+    TCB0.CCMP = 100;
     // タイムアウトモード
     TCB0.CTRLB = TCB_CNTMODE_TIMEOUT_gc;
-    TCB0.CTRLA = TCB_ENABLE_bm;
+    TCB0.CTRLA = TCB_CLKSEL_DIV2_gc | TCB_ENABLE_bm; // オーバーフロー割り込みの頻度低減のためDIV2
 
     // SPIの設定
     SPI0.CTRLA = SPI_ENABLE_bm;
@@ -155,17 +155,24 @@ ISR(SPI0_INT_vect)
 
 ISR(TCB0_INT_vect)
 {
+    uint8_t count;
+    count = 0;
     // タイムアウト
     if (len > 0) {
         SPI0.INTCTRL = 0;
         // 8ビットに満たない部分的データを受信
-        do {
+        while (!(SPI0.INTFLAGS & SPI_RXCIF_bm)) {
             // PC0(TCB2 OUT)はPA6(SPI0 SCK)に接続してあるのでSCKをトグル
             PORTC.PIN0CTRL = PORT_INVEN_bm;
             PORTC.PIN0CTRL = 0;
-        } while (SPI0.INTFLAGS & SPI_RXCIF_bm);
+            _delay_us(1); // delay入れてないとINTFLAGSが立つのが間に合わない（別になくても動作に影響はない）
+            count++;
+        }
         SPI0.INTFLAGS = SPI_RXCIF_bm;
-        puthex(SPI0.DATA);
+        if (count < 8)
+            puthex(SPI0.DATA);
+        else
+            SPI0.DATA; // 空読み
         uart_putc('\n');
     }
     // SPIの初期化
