@@ -2,6 +2,7 @@
 #include <avr/interrupt.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <util/atomic.h>
 
 void fifo_init(FIFO *fifo)
 {
@@ -18,9 +19,10 @@ bool fifo_get(FIFO *fifo, uint8_t *data)
     idx = fifo->get_idx;
     *data = fifo->buffer[idx];
     fifo->get_idx = (idx + 1) & (FIFO_BUFFER_SIZE - 1);
-    cli();
-    fifo->len--;
-    sei();
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        fifo->len--;
+    }
 
     return 0;
 }
@@ -35,9 +37,10 @@ bool fifo_put(FIFO *fifo, uint8_t data)
     idx = fifo->put_idx;
     fifo->buffer[idx] = data;
     fifo->put_idx = (idx + 1) & (FIFO_BUFFER_SIZE - 1);
-    cli();
-    fifo->len++;
-    sei();
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        fifo->len++;
+    }
 
     return 0;
 }
