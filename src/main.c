@@ -5,6 +5,55 @@
 #include <util/delay.h>
 #include "uart.h"
 
+#define ENABLE_TX() PORTD.OUTSET = PIN6_bm;
+#define DISABLE_TX() PORTD.CLRSET = PIN6_bm;
+#define ENABLE_RX() PORTD.OUTSET = PIN7_bm;
+#define DISABLE_RX() PORTD.CLRSET = PIN7_bm;
+
+enum k_code {
+    K_CODE_SYNC1 = 0x11,
+    K_CODE_SYNC2 = 0x12,
+    K_CODE_SYNC3 = 0x13,
+    K_CODE_RST1 = 0x21,
+    K_CODE_RST2 = 0x22,
+    K_CODE_EOP = 0x30,
+    K_CODE_ERROR = 0xff
+};
+
+const uint8_t symbol[] = {
+    K_CODE_ERROR,
+    K_CODE_ERROR,
+    K_CODE_ERROR,
+    K_CODE_ERROR,
+    K_CODE_ERROR,
+    K_CODE_SYNC3,
+    K_CODE_RST1,
+    K_CODE_ERROR,
+    0x1,
+    0x4,
+    0x5,
+    K_CODE_ERROR,
+    K_CODE_EOP,
+    0x6,
+    0x7,
+    K_CODE_ERROR,
+    K_CODE_SYNC2,
+    0x8,
+    0x9,
+    0x2,
+    0x3,
+    0xa,
+    0xb,
+    K_CODE_SYNC1,
+    K_CODE_RST2,
+    0xc,
+    0xd,
+    0xe,
+    0xf,
+    0x0,
+    K_CODE_ERROR
+};
+
 static uint16_t len;
 
 static int uart_putchar(char c, FILE *stream)
@@ -13,6 +62,21 @@ static int uart_putchar(char c, FILE *stream)
     return 0;
 }
 static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL, _FDEV_SETUP_WRITE);
+
+static const char *message[] = {
+    "555555555555555518C71929EFEF56EEF52DB0",           //2
+    "555555555555555518C712A9F25965D53FD25173AD79BAB0", //3
+    "555555555555555518C71928AFF676FD75CAB0",           //6
+    "555555555555555518C719294F2B52D76EEDB0",           //8
+    "555555555555555518C712A8B24ADE5ABEA53E56E5A7A7B0", //9
+    "555555555555555518C71929CF3A72B4EE4AB0",           //12
+    "555555555555555518C719292FCA5477B9CDB0"            //14
+};
+
+static const uint8_t bmc[] = {
+    0x33, 0x32, 0x34, 0x35, 0x2c, 0x2d, 0x2b, 0x2a,
+    0x8c, 0x8d, 0x8b, 0x8a, 0x53, 0x52, 0x54, 0x55
+};
 
 static void puthex(uint8_t val)
 {
@@ -37,6 +101,7 @@ int main(void)
     // メインクロックを24MHzに
     _PROTECTED_WRITE(CLKCTRL.OSCHFCTRLA, CLKCTRL_CLKOUT_bm | CLKCTRL_FRQSEL_24M_gc);
 
+    /* 受信設定 ---------------------------------------------------------------- */
     // アナログコンパレーターの初期化
     VREF.ACREF = VREF_REFSEL_2V048_gc;
     AC0.MUXCTRL = AC_INITVAL_HIGH_gc | AC_MUXPOS_AINP0_gc | AC_MUXNEG_DACREF_gc;
@@ -51,8 +116,7 @@ int main(void)
     EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL0_gc;
     // TCB1を0.4usのワンショットに設定
     // TCB1.CTRLB = TCB_ASYNC_bm | TCB_CNTMODE_SINGLE_gc;
-    PORTA.DIRSET = PIN3_bm;                                            // デバッグ用
-    TCB1.CTRLB = TCB_ASYNC_bm | TCB_CCMPEN_bm | TCB_CNTMODE_SINGLE_gc; // PA3ピンに出力（デバッグ用）
+    TCB1.CTRLB = TCB_ASYNC_bm | TCB_CNTMODE_SINGLE_gc;
     TCB1.EVCTRL = TCB_EDGE_bm | TCB_CAPTEI_bm;
     TCB1.CNT = 10;
     TCB1.CCMP = 10;
@@ -70,44 +134,42 @@ int main(void)
     TCB2.CCMP = 53;
     TCB2.CTRLA = TCB_ENABLE_bm;
 
-    // CCL LUTの0と1をD-FFに設定
-    CCL.SEQCTRL0 = CCL_SEQSEL_DFF_gc;
-
-    // CCL LUT0のEVENTAにEVENT0を接続
-    EVSYS.USERCCLLUT0A = EVSYS_USER_CHANNEL0_gc;
-    // CCL LUT0の入力0が1の時に出力が1（入力0のバッファ）（入力1, 2はDon't care）
-    CCL.TRUTH0 = 0xAA;
-    // CCL LUT0の入力2にTCB2出力
-    CCL.LUT0CTRLC = CCL_INSEL2_TCB2_gc;
-    // CCL LUT0の入力0にEVENTA
-    CCL.LUT0CTRLB = CCL_INSEL1_MASK_gc | CCL_INSEL0_EVENTA_gc;
-    // CCL LUT0のクロック（D-FFのクロック）は入力2（TCB2出力）
-    CCL.LUT0CTRLA = CCL_CLKSRC_IN2_gc | CCL_ENABLE_bm;
-    // EVEVT2をCCL LUT0の出力（D-FFの出力）に設定
-    EVSYS.CHANNEL2 = EVSYS_CHANNEL2_CCL_LUT0_gc;
-    // イベント2をEVOUTC(PC2)ピンへ出力（デバッグ用）
-    EVSYS.USEREVSYSEVOUTC = EVSYS_USER_CHANNEL2_gc;
-
-    // CCL LUT1（D-FFのゲート）は常に1出力
-    CCL.TRUTH1 = 0xFF;
-    CCL.LUT1CTRLC = CCL_INSEL2_MASK_gc;
-    CCL.LUT1CTRLB = CCL_INSEL1_MASK_gc | CCL_INSEL0_MASK_gc;
-    CCL.LUT1CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_ENABLE_bm;
+    // CCL LUTの2と3をD-FFに設定
+    CCL.SEQCTRL1 = CCL_SEQSEL_DFF_gc;
 
     // CCL LUT2のEVENTAにEVENT0を接続
     EVSYS.USERCCLLUT2A = EVSYS_USER_CHANNEL0_gc;
-    // CCL LUT2のEVENTBにEVENT2を接続
-    EVSYS.USERCCLLUT2B = EVSYS_USER_CHANNEL2_gc;
-    // 入力1と入力2のXOR
-    CCL.TRUTH2 = 0x06;
-    // CCL LUT2の入力1にEVENTB、入力2にEVENTA
-    CCL.LUT2CTRLC = CCL_INSEL2_MASK_gc;
-    CCL.LUT2CTRLB = CCL_INSEL1_EVENTB_gc | CCL_INSEL0_EVENTA_gc;
-    // CCL LUT2の出力をPD3へ出力
-    PORTD.DIRSET = PIN3_bm;
-    CCL.LUT2CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_OUTEN_bm | CCL_ENABLE_bm;
+    // CCL LUT2の入力0が1の時に出力が1（入力0のバッファ）（入力1, 2はDon't care）
+    CCL.TRUTH2 = 0xAA;
+    // CCL LUT2の入力2にTCB2出力
+    CCL.LUT2CTRLC = CCL_INSEL2_TCB2_gc;
+    // CCL LUT2の入力0にEVENTA
+    CCL.LUT2CTRLB = CCL_INSEL1_MASK_gc | CCL_INSEL0_EVENTA_gc;
+    // CCL LUT2のクロック（D-FFのクロック）は入力2（TCB2出力）
+    CCL.LUT2CTRLA = CCL_CLKSRC_IN2_gc | CCL_ENABLE_bm;
+    // EVEVT2をCCL LUT2の出力（D-FFの出力）に設定
+    EVSYS.CHANNEL2 = EVSYS_CHANNEL2_CCL_LUT2_gc;
+    // イベント2をEVOUTC(PC2)ピンへ出力（デバッグ用）
+    EVSYS.USEREVSYSEVOUTC = EVSYS_USER_CHANNEL2_gc;
 
-    CCL.CTRLA = CCL_ENABLE_bm;
+    // CCL LUT3（D-FFのゲート）は常に1出力
+    CCL.TRUTH3 = 0xFF;
+    CCL.LUT3CTRLC = CCL_INSEL2_MASK_gc;
+    CCL.LUT3CTRLB = CCL_INSEL1_MASK_gc | CCL_INSEL0_MASK_gc;
+    CCL.LUT3CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_ENABLE_bm;
+
+    // CCL LUT0のEVENTAにEVENT0を接続
+    EVSYS.USERCCLLUT0A = EVSYS_USER_CHANNEL0_gc;
+    // CCL LUT0のEVENTBにEVENT2を接続
+    EVSYS.USERCCLLUT0B = EVSYS_USER_CHANNEL2_gc;
+    // 入力1と入力2のXOR
+    CCL.TRUTH0 = 0x06;
+    // CCL LUT0の入力1にEVENTB、入力2にEVENTA
+    CCL.LUT0CTRLC = CCL_INSEL2_MASK_gc;
+    CCL.LUT0CTRLB = CCL_INSEL1_EVENTB_gc | CCL_INSEL0_EVENTA_gc;
+    // CCL LUT0の出力をPA3へ出力
+    PORTA.DIRSET = PIN3_bm;
+    CCL.LUT0CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_OUTEN_bm | CCL_ENABLE_bm;
 
     // 通信の終わり検知用タイマー
     // イベント0をTCB0の入力に設定
@@ -130,6 +192,22 @@ int main(void)
     PORTC.DIRSET = PIN1_bm; // SS（デバッグ用）
     PORTC.OUTSET = PIN1_bm;
     PORTC.OUTCLR = PIN1_bm;
+    /* 受信設定ここまで --------------------------------------------------------- */
+
+    /* 送信設定 ---------------------------------------------------------------- */
+    // Not(USART2 TXD)
+    CCL.TRUTH3 = 0x0f;
+    CCL.LUT3CTRLC = CCL_INSEL2_USART2_gc;
+    // CCL.LUT3CTRLB = CCL_INSEL0_MASK_gc | CCL_INSEL1_MASK_gc;
+    PORTC.DIRSET = PIN3_bm;
+    CCL.LUT0CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_OUTEN_bm | CCL_ENABLE_bm;
+
+    /* 送信設定ここまで --------------------------------------------------------- */
+
+    CCL.CTRLA = CCL_ENABLE_bm;
+
+    PORTD.DIRSET = PIN6_bm | PIN7_bm;
+    ENABLE_RX();
 
     len = 0;
 
