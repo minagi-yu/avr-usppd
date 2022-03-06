@@ -1,57 +1,33 @@
 #include <avr/interrupt.h>
 #include <avr/io.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <util/delay.h>
 #include "uart.h"
 
-#define ENABLE_TX() PORTD.OUTSET = PIN6_bm;
-#define DISABLE_TX() PORTD.CLRSET = PIN6_bm;
-#define ENABLE_RX() PORTD.OUTSET = PIN7_bm;
-#define DISABLE_RX() PORTD.CLRSET = PIN7_bm;
+#define ENABLE_TX() PORTD.OUTSET = PIN0_bm;
+#define DISABLE_TX() PORTD.OUTCLR = PIN0_bm;
+#define ENABLE_RX() PORTD.OUTSET = PIN1_bm;
+#define DISABLE_RX() PORTD.OUTCLR = PIN1_bm;
 
 enum k_code {
-    K_CODE_SYNC1 = 0x11,
-    K_CODE_SYNC2 = 0x12,
-    K_CODE_SYNC3 = 0x13,
-    K_CODE_RST1 = 0x21,
-    K_CODE_RST2 = 0x22,
-    K_CODE_EOP = 0x30,
-    K_CODE_ERROR = 0xff
-};
-
-const uint8_t symbol[] = {
-    K_CODE_ERROR,
-    K_CODE_ERROR,
-    K_CODE_ERROR,
-    K_CODE_ERROR,
-    K_CODE_ERROR,
-    K_CODE_SYNC3,
-    K_CODE_RST1,
-    K_CODE_ERROR,
-    0x1,
-    0x4,
-    0x5,
-    K_CODE_ERROR,
-    K_CODE_EOP,
-    0x6,
-    0x7,
-    K_CODE_ERROR,
-    K_CODE_SYNC2,
-    0x8,
-    0x9,
-    0x2,
-    0x3,
-    0xa,
-    0xb,
-    K_CODE_SYNC1,
-    K_CODE_RST2,
-    0xc,
-    0xd,
-    0xe,
-    0xf,
-    0x0,
-    K_CODE_ERROR
+    K_CODE_SYNC1 = 0x10,
+    K_CODE_SYNC2 = 0x11,
+    K_CODE_RST1 = 0x12,
+    K_CODE_RST2 = 0x13,
+    K_CODE_EOP = 0x14,
+    K_CODE_RESERVED15 = 0x15,
+    K_CODE_RESERVED16 = 0x16,
+    K_CODE_RESERVED17 = 0x17,
+    K_CODE_RESERVED18 = 0x18,
+    K_CODE_RESERVED19 = 0x19,
+    K_CODE_RESERVED1A = 0x1A,
+    K_CODE_SYNC3 = 0x1B,
+    K_CODE_RESERVED1C = 0x1C,
+    K_CODE_RESERVED1D = 0x1D,
+    K_CODE_RESERVED1E = 0x1E,
+    K_CODE_RESERVED1F = 0x1F,
 };
 
 static uint16_t len;
@@ -73,9 +49,50 @@ static const char *message[] = {
     "555555555555555518C719292FCA5477B9CDB0"            //14
 };
 
+// 外部回路で反転しているため、事前に反転しておく
 static const uint8_t bmc[] = {
-    0x33, 0x32, 0x34, 0x35, 0x2c, 0x2d, 0x2b, 0x2a,
-    0x8c, 0x8d, 0x8b, 0x8a, 0x53, 0x52, 0x54, 0x55
+    ~0x33, ~0x32, ~0x34, ~0x35, ~0x2c, ~0x2d, ~0x2b, ~0x2a,
+    ~0x8c, ~0x8d, ~0x8b, ~0x8a, ~0x53, ~0x52, ~0x54, ~0x55
+};
+static const uint8_t symbol4b5b[] = {
+    0x0F, 0x12, 0x05, 0x15, 0x0A, 0x1A, 0x0E, 0x1E,
+    0x09, 0x19, 0x0D, 0x1D, 0x0B, 0x1B, 0x07, 0x17,
+    0x03, 0x11, 0x1C, 0x13, 0x16, 0x00, 0x10, 0x08,
+    0x18, 0x04, 0x14, 0x0C, 0x02, 0x06, 0x01, 0x1F
+};
+const uint8_t symbol5b4b[] = {
+    K_CODE_RESERVED15,
+    K_CODE_RESERVED1E,
+    K_CODE_RESERVED1C,
+    K_CODE_SYNC1,
+    K_CODE_RESERVED19,
+    0x02,
+    K_CODE_RESERVED1D,
+    0x0E,
+    K_CODE_RESERVED17,
+    0x08,
+    0x04,
+    0x0C,
+    K_CODE_SYNC3,
+    0x0A,
+    0x06,
+    0x00,
+    K_CODE_RESERVED16,
+    K_CODE_SYNC2,
+    0x01,
+    K_CODE_RST2,
+    K_CODE_RESERVED1A,
+    0x03,
+    K_CODE_EOP,
+    0x0F,
+    K_CODE_RESERVED18,
+    0x09,
+    0x05,
+    0x0D,
+    K_CODE_RST1,
+    0x0B,
+    0x07,
+    K_CODE_RESERVED1F,
 };
 
 static void puthex(uint8_t val)
@@ -93,6 +110,91 @@ static void puthex(uint8_t val)
         uart_putc(vl - 10 + 'A');
     } else {
         uart_putc(vl + '0');
+    }
+}
+
+void uart2_send(uint8_t data)
+{
+    while (!(USART2.STATUS & USART_DREIF_bm))
+        ;
+    USART2.TXDATAL = data;
+}
+
+void pd_phy_4bto5b(uint8_t *data, uint_fast8_t len, uint8_t **converted, uint_fast8_t *bitpos)
+{
+    uint8_t nibble;
+    uint_fast8_t count;
+
+    count = len * 2;
+    do {
+        nibble = (count % 2) ? (*data >> 4) : (*data & 0x0f);
+        *bitpos %= 8;
+        if (*bitpos < 3) {
+            if (*bitpos == 0)
+                **converted = 0;
+            **converted |= symbol4b5b[nibble] << (3 - *bitpos);
+        } else if (*bitpos == 3) {
+            **converted |= symbol4b5b[nibble];
+            *converted++;
+        } else {
+            **converted |= symbol4b5b[nibble] >> (*bitpos - 3);
+            *converted++;
+            **converted = 0;
+            **converted |= symbol4b5b[nibble] << (*bitpos - 3);
+        }
+        *bitpos += 5;
+    } while (--count);
+}
+
+void pd_phy_send(uint8_t *data, uint_fast8_t len)
+{
+    static uint8_t buffer[(20 + 20 + (40 * 7) + 40) / 8];
+    uint8_t *p = buffer;
+    uint_fast8_t bitpos = 0;
+    uint_fast8_t count;
+    bool inverce = false;
+
+    // // Copy SOP
+    // memcpy(&p, (uint8_t[]){ 0x18, 0xc7, 0x10 }, 3);
+    // p += 4 * 5 / 8;
+    // bitpos = 4 * 5 % 8;
+
+    // // Copy data
+    // pd_phy_4bto5b(data, len, &p, &bitpos);
+
+    // // Calc CRC
+
+    // // Copy CRC
+
+    memcpy(buffer, (uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0xEF, 0xEF, 0x56, 0xEE, 0xF5, 0x2D }, 10);
+
+    // Send Preamble
+    count = 64 * 2 / 8;
+    do {
+        uart2_send(~0x2d);
+    } while (--count);
+
+    // Send Payload
+    count = (20 + (8 / 4 * 5 * len) + 40) / 8;
+    p = buffer;
+    do {
+        uint8_t d;
+        d = bmc[*p >> 4];
+        uart2_send(inverce ? d : ~d);
+        inverce ^= d & 0x01;
+        d = bmc[*p & 0x0f];
+        uart2_send(inverce ? d : ~d);
+        inverce ^= d & 0x01;
+        p++;
+    } while (--count);
+
+    // Send EOP
+    if (inverce) {
+        uart2_send(~0x2b);
+        uart2_send(~0x40);
+    } else {
+        uart2_send(~0x2b);
+        uart2_send(~0xb0);
     }
 }
 
@@ -202,11 +304,25 @@ int main(void)
     PORTC.DIRSET = PIN3_bm;
     CCL.LUT0CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_OUTEN_bm | CCL_ENABLE_bm;
 
+    USART2.BAUD = F_CPU / 2 / 600000;
+    // USART2.CTRLA = 0;
+    USART2.CTRLB = USART_TXEN_bm;
+    USART2.CTRLC = USART_CMODE_MSPI_gc; // MSB first
+    PORTF.DIRSET = PIN0_bm;
+    // USART2.BAUD = ((float)(F_CPU * 64.0f / (16.0f * (float)460800)) + 0.5f);
+    // USART2.CTRLC = USART_CHSIZE_8BIT_gc;
+    // USART2.CTRLB = (USART_RXEN_bm | USART_TXEN_bm);
+
+    VREF.DAC0REF = VREF_REFSEL_2V048_gc;
+    PORTD.PIN6CTRL = PORT_ISC_INPUT_DISABLE_gc;
+    DAC0.CTRLA = DAC_OUTEN_bm | DAC_ENABLE_bm;
+    // DATAレジスタは上位詰めなので注意！
+    DAC0.DATA = (1200UL * 1024 / 2048) << 6; // 1.2V (1.2 * 1024 / 2.048)
     /* 送信設定ここまで --------------------------------------------------------- */
 
     CCL.CTRLA = CCL_ENABLE_bm;
 
-    PORTD.DIRSET = PIN6_bm | PIN7_bm;
+    PORTD.DIRSET = PIN0_bm | PIN1_bm;
     ENABLE_RX();
 
     len = 0;
@@ -214,9 +330,12 @@ int main(void)
     stdout = &mystdout;
     uart_init();
 
+    // pd_phy_send(NULL, 2);
+
     for (;;) {
         // puts("Hello World");
         // _delay_ms(500);
+        uart2_send(0xaa);
     }
 }
 
