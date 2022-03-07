@@ -169,10 +169,10 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
     memcpy(buffer, (uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0xEF, 0xEF, 0x56, 0xEE, 0xF5, 0x2D }, 10);
 
     // Send Preamble
-    count = 64 * 2 / 8;
-    do {
-        uart2_send(~0x2d);
-    } while (--count);
+    // count = 64 * 2 / 8;
+    // do {
+    //     uart2_send(~0x2d);
+    // } while (--count);
 
     // Send Payload
     count = (20 + (8 / 4 * 5 * len) + 40) / 8;
@@ -181,20 +181,20 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
         uint8_t d;
         d = bmc[*p >> 4];
         uart2_send(inverce ? d : ~d);
-        inverce ^= d & 0x01;
+        inverce = d & 0x01;
         d = bmc[*p & 0x0f];
         uart2_send(inverce ? d : ~d);
-        inverce ^= d & 0x01;
+        inverce = d & 0x01;
         p++;
     } while (--count);
 
     // Send EOP
     if (inverce) {
-        uart2_send(~0x2b);
-        uart2_send(~0x40);
+        uart2_send(0x8a);
+        uart2_send(0x3f);
     } else {
-        uart2_send(~0x2b);
-        uart2_send(~0xb0);
+        uart2_send(~0x8a);
+        uart2_send(~0xc0);
     }
 }
 
@@ -298,13 +298,13 @@ int main(void)
 
     /* 送信設定 ---------------------------------------------------------------- */
     // Not(USART2 TXD)
-    CCL.TRUTH3 = 0x0f;
-    CCL.LUT3CTRLC = CCL_INSEL2_USART2_gc;
+    CCL.TRUTH1 = 0x0f;
+    CCL.LUT1CTRLC = CCL_INSEL2_USART2_gc;
     // CCL.LUT3CTRLB = CCL_INSEL0_MASK_gc | CCL_INSEL1_MASK_gc;
     PORTC.DIRSET = PIN3_bm;
-    CCL.LUT0CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_OUTEN_bm | CCL_ENABLE_bm;
+    CCL.LUT1CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_OUTEN_bm | CCL_ENABLE_bm;
 
-    USART2.BAUD = F_CPU / 2 / 600000;
+    USART2.BAUD = (F_CPU / 2 / 600000) << 6;
     // USART2.CTRLA = 0;
     USART2.CTRLB = USART_TXEN_bm;
     USART2.CTRLC = USART_CMODE_MSPI_gc; // MSB first
@@ -325,17 +325,17 @@ int main(void)
     PORTD.DIRSET = PIN0_bm | PIN1_bm;
     ENABLE_RX();
 
+    PORTD.DIRSET = PIN7_bm; // デバッグ用
+
     len = 0;
 
     stdout = &mystdout;
     uart_init();
 
-    // pd_phy_send(NULL, 2);
-
     for (;;) {
         // puts("Hello World");
-        // _delay_ms(500);
-        uart2_send(0xaa);
+        _delay_ms(500);
+        pd_phy_send(NULL, 2);
     }
 }
 
