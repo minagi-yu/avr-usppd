@@ -169,6 +169,7 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
     memcpy(buffer, (uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0xEF, 0xEF, 0x56, 0xEE, 0xF5, 0x2D }, 10);
 
     ENABLE_TX();
+    USART2.STATUS = USART_TXCIF_bm;
 
     // Send Preamble
     // count = 64 * 2 / 8;
@@ -199,6 +200,8 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
         uart2_send(0xcf);
     }
 
+    while (!(USART2.STATUS & USART_TXCIF_bm))
+        ;
     DISABLE_TX();
 }
 
