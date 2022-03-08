@@ -52,7 +52,7 @@ static const char *message[] = {
 // 外部回路で反転しているため、事前に反転しておく
 static const uint8_t bmc[] = {
     ~0x33, ~0x32, ~0x34, ~0x35, ~0x2c, ~0x2d, ~0x2b, ~0x2a,
-    ~0x8c, ~0x8d, ~0x8b, ~0x8a, ~0x53, ~0x52, ~0x54, ~0x55
+    ~0x4c, ~0x4d, ~0x4b, ~0x4a, ~0x53, ~0x52, ~0x54, ~0x55
 };
 static const uint8_t symbol4b5b[] = {
     0x0F, 0x12, 0x05, 0x15, 0x0A, 0x1A, 0x0E, 0x1E,
@@ -152,7 +152,7 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
     uint8_t *p = buffer;
     uint_fast8_t bitpos = 0;
     uint_fast8_t count;
-    bool inverce = false;
+    bool inverce = true;
 
     // // Copy SOP
     // memcpy(&p, (uint8_t[]){ 0x18, 0xc7, 0x10 }, 3);
@@ -168,6 +168,8 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
 
     memcpy(buffer, (uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0xEF, 0xEF, 0x56, 0xEE, 0xF5, 0x2D }, 10);
 
+    ENABLE_TX();
+
     // Send Preamble
     // count = 64 * 2 / 8;
     // do {
@@ -181,21 +183,23 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
         uint8_t d;
         d = bmc[*p >> 4];
         uart2_send(inverce ? d : ~d);
-        inverce = d & 0x01;
+        inverce ^= d & 0x01;
         d = bmc[*p & 0x0f];
         uart2_send(inverce ? d : ~d);
-        inverce = d & 0x01;
+        inverce ^= d & 0x01;
         p++;
     } while (--count);
 
     // Send EOP
     if (inverce) {
-        uart2_send(0x8a);
-        uart2_send(0x3f);
-    } else {
-        uart2_send(~0x8a);
+        uart2_send(~0x4a);
         uart2_send(~0xc0);
+    } else {
+        uart2_send(0x4a);
+        uart2_send(0xcf);
     }
+
+    DISABLE_TX();
 }
 
 int main(void)
@@ -329,8 +333,8 @@ int main(void)
 
     len = 0;
 
-    stdout = &mystdout;
-    uart_init();
+    // stdout = &mystdout;
+    // uart_init();
 
     for (;;) {
         // puts("Hello World");
