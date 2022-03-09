@@ -168,14 +168,19 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
 
     memcpy(buffer, (uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0xEF, 0xEF, 0x56, 0xEE, 0xF5, 0x2D }, 10);
 
-    ENABLE_TX();
     USART2.STATUS = USART_TXCIF_bm;
 
+    USART2.TXDATAL = 0xff;
+    USART2.TXDATAL = ~0x2d;
+
+    _delay_us(13);
+    ENABLE_TX();
+
     // Send Preamble
-    // count = 64 * 2 / 8;
-    // do {
-    //     uart2_send(~0x2d);
-    // } while (--count);
+    count = 64 * 2 / 8 - 1;
+    do {
+        uart2_send(~0x2d);
+    } while (--count);
 
     // Send Payload
     count = (20 + (8 / 4 * 5 * len) + 40) / 8;
