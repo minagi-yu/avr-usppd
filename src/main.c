@@ -166,7 +166,9 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
 
     // // Copy CRC
 
-    memcpy(buffer, (uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0xEF, 0xEF, 0x56, 0xEE, 0xF5, 0x2D }, 10);
+    memcpy(buffer, data, 5 + len * 5 + 5);
+
+    DISABLE_RX();
 
     USART2.STATUS = USART_TXCIF_bm;
 
@@ -208,6 +210,7 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
     while (!(USART2.STATUS & USART_TXCIF_bm))
         ;
     DISABLE_TX();
+    ENABLE_RX();
 }
 
 int main(void)
@@ -347,7 +350,14 @@ int main(void)
     for (;;) {
         // puts("Hello World");
         _delay_ms(500);
-        pd_phy_send(NULL, 2);
+        pd_phy_send((uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0xEF, 0xEF, 0x56, 0xEE, 0xF5, 0x2D }, 2);
+        _delay_ms(1);
+        pd_phy_send((uint8_t[]){ 0x18, 0xC7, 0x12, 0xA5, 0xF2, 0x59, 0x64, 0xBA, 0xA7, 0xD2, 0x5A, 0xA4, 0x53, 0xB7, 0xAE }, 6);
+        _delay_ms(1);
+        pd_phy_send((uint8_t[]){ 0x18, 0xC7, 0x19, 0x28, 0xAF, 0xF6, 0x76, 0xFD, 0x75, 0xCA }, 2);
+        _delay_ms(1);
+        pd_phy_send((uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0x4F, 0x2B, 0x52, 0xD7, 0x6E, 0xED }, 2);
+        _delay_ms(1);
     }
 }
 
