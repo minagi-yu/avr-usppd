@@ -3,7 +3,7 @@ ATPACK = /home/minagi/Downloads/AVR-Dx_DFP
 
 DEFS = F_CPU=24000000
 
-COMPORT = /dev/ttyS3
+COMPORT = /dev/ttyS4
 
 PROJECT := $(shell basename `pwd`)
 

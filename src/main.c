@@ -8,8 +8,16 @@
 
 #define ENABLE_TX() PORTD.OUTSET = PIN0_bm;
 #define DISABLE_TX() PORTD.OUTCLR = PIN0_bm;
-#define ENABLE_RX() PORTD.OUTSET = PIN1_bm;
-#define DISABLE_RX() PORTD.OUTCLR = PIN1_bm;
+#define ENABLE_RX()                  \
+    do {                             \
+        PORTD.OUTSET = PIN1_bm;      \
+        SPI0.CTRLA |= SPI_ENABLE_bm; \
+    } while (0)
+#define DISABLE_RX()                  \
+    do {                              \
+        /* PORTD.OUTCLR = PIN1_bm; */ \
+        SPI0.CTRLA &= ~SPI_ENABLE_bm; \
+    } while (0)
 
 enum k_code {
     K_CODE_SYNC1 = 0x10,
@@ -31,6 +39,7 @@ enum k_code {
 };
 
 static uint16_t len;
+static volatile uint16_t msgid;
 
 static int uart_putchar(char c, FILE *stream)
 {
@@ -169,6 +178,7 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
     memcpy(buffer, data, 5 + len * 5 + 5);
 
     DISABLE_RX();
+    cli();
 
     USART2.STATUS = USART_TXCIF_bm;
 
@@ -211,6 +221,7 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
         ;
     DISABLE_TX();
     ENABLE_RX();
+    sei();
 }
 
 int main(void)
@@ -343,21 +354,27 @@ int main(void)
     PORTD.DIRSET = PIN7_bm; // デバッグ用
 
     len = 0;
+    msgid = 0;
 
-    // stdout = &mystdout;
-    // uart_init();
+    stdout = &mystdout;
+    uart_init();
 
     for (;;) {
         // puts("Hello World");
-        _delay_ms(500);
+        // _delay_ms(500);
+        while (msgid != 1)
+            ;
         pd_phy_send((uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0xEF, 0xEF, 0x56, 0xEE, 0xF5, 0x2D }, 2);
-        _delay_ms(1);
-        pd_phy_send((uint8_t[]){ 0x18, 0xC7, 0x12, 0xA5, 0xF2, 0x59, 0x64, 0xBA, 0xA7, 0xD2, 0x5A, 0xA4, 0x53, 0xB7, 0xAE }, 6);
-        _delay_ms(1);
+        _delay_us(20);
+        pd_phy_send((uint8_t[]){ 0x18, 0xC7, 0x12, 0xA9, 0xF2, 0x59, 0x65, 0xD5, 0x3F, 0xD2, 0x51, 0x73, 0xAD, 0x79, 0xBA }, 6);
+        while (msgid != 3)
+            ;
         pd_phy_send((uint8_t[]){ 0x18, 0xC7, 0x19, 0x28, 0xAF, 0xF6, 0x76, 0xFD, 0x75, 0xCA }, 2);
-        _delay_ms(1);
+        while (msgid != 4)
+            ;
         pd_phy_send((uint8_t[]){ 0x18, 0xC7, 0x19, 0x29, 0x4F, 0x2B, 0x52, 0xD7, 0x6E, 0xED }, 2);
-        _delay_ms(1);
+        for (;;)
+            ;
     }
 }
 
@@ -392,6 +409,9 @@ ISR(TCB0_INT_vect)
             puthex(SPI0.DATA);
         else
             SPI0.DATA; // 空読み
+        // uart_putc('\t');
+        msgid++;
+        // uart_putc(msgid + '0');
         uart_putc('\n');
     }
     // SPIの初期化
