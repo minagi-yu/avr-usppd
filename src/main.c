@@ -240,27 +240,29 @@ int main(void)
     // イベント0をEVOUTA(PA2)ピンに出力（デバッグ用）
     EVSYS.USEREVSYSEVOUTA = EVSYS_USER_CHANNEL0_gc;
 
-    // イベント0をTCB1の入力に設定
-    EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL0_gc;
-    // TCB1を0.4usのワンショットに設定
+    // // イベント0をTCB1の入力に設定
+    // EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL0_gc;
+    // // TCB1を0.4usのワンショットに設定
+    // // TCB1.CTRLB = TCB_ASYNC_bm | TCB_CNTMODE_SINGLE_gc;
     // TCB1.CTRLB = TCB_ASYNC_bm | TCB_CNTMODE_SINGLE_gc;
-    TCB1.CTRLB = TCB_ASYNC_bm | TCB_CNTMODE_SINGLE_gc;
-    TCB1.EVCTRL = TCB_EDGE_bm | TCB_CAPTEI_bm;
-    TCB1.CNT = 10;
-    TCB1.CCMP = 10;
-    TCB1.CTRLA = TCB_ENABLE_bm;
-    // イベント1をTCB1の出力に設定
-    EVSYS.CHANNEL1 = EVSYS_CHANNEL1_TCB1_CAPT_gc;
+    // TCB1.EVCTRL = TCB_EDGE_bm | TCB_CAPTEI_bm;
+    // TCB1.CNT = 20;
+    // TCB1.CCMP = 20;
+    // TCB1.CTRLA = TCB_ENABLE_bm;
+    // // イベント1をTCB1の出力に設定
+    // EVSYS.CHANNEL1 = EVSYS_CHANNEL1_TCB1_CAPT_gc;
 
-    // イベント1をTCB2の入力に設定
-    EVSYS.USERTCB2CAPT = EVSYS_USER_CHANNEL1_gc;
-    // TCB2を2.2usのワンショットに設定
+    // イベント0をTCB2の入力に設定
+    EVSYS.USERTCB2CAPT = EVSYS_USER_CHANNEL0_gc;
+    // TCB2を2usのワンショットに設定
     PORTC.DIRSET = PIN0_bm;
     TCB2.CTRLB = TCB_ASYNC_bm | TCB_CCMPEN_bm | TCB_CNTMODE_SINGLE_gc; // PC0ピンに出力
-    TCB2.EVCTRL = TCB_CAPTEI_bm;
-    TCB2.CNT = 53;
-    TCB2.CCMP = 53;
+    TCB2.EVCTRL = TCB_EDGE_bm | TCB_CAPTEI_bm;
+    TCB2.CNT = 48;
+    TCB2.CCMP = 48;
     TCB2.CTRLA = TCB_ENABLE_bm;
+    // TCB2出力をイベント1へ
+    EVSYS.CHANNEL1 = EVSYS_CHANNEL1_TCB2_CAPT_gc;
 
     // CCL LUTの2と3をD-FFに設定
     CCL.SEQCTRL1 = CCL_SEQSEL_DFF_gc;
@@ -270,7 +272,8 @@ int main(void)
     // CCL LUT2の入力0が1の時に出力が1（入力0のバッファ）（入力1, 2はDon't care）
     CCL.TRUTH2 = 0xAA;
     // CCL LUT2の入力2にTCB2出力
-    CCL.LUT2CTRLC = CCL_INSEL2_TCB2_gc;
+    EVSYS.USERCCLLUT2B = EVSYS_USER_CHANNEL1_gc;
+    CCL.LUT2CTRLC = CCL_INSEL2_EVENTB_gc;
     // CCL LUT2の入力0にEVENTA
     CCL.LUT2CTRLB = CCL_INSEL1_MASK_gc | CCL_INSEL0_EVENTA_gc;
     // CCL LUT2のクロック（D-FFのクロック）は入力2（TCB2出力）
@@ -290,8 +293,8 @@ int main(void)
     EVSYS.USERCCLLUT0A = EVSYS_USER_CHANNEL0_gc;
     // CCL LUT0のEVENTBにEVENT2を接続
     EVSYS.USERCCLLUT0B = EVSYS_USER_CHANNEL2_gc;
-    // 入力1と入力2のXOR
-    CCL.TRUTH0 = 0x06;
+    // 入力1と入力2のXNOR
+    CCL.TRUTH0 = 0x09;
     // CCL LUT0の入力1にEVENTB、入力2にEVENTA
     CCL.LUT0CTRLC = CCL_INSEL2_MASK_gc;
     CCL.LUT0CTRLB = CCL_INSEL1_EVENTB_gc | CCL_INSEL0_EVENTA_gc;
