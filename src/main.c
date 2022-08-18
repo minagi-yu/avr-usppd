@@ -8,10 +8,10 @@
 
 #define ENABLE_TX() PORTD.OUTSET = PIN0_bm;
 #define DISABLE_TX() PORTD.OUTCLR = PIN0_bm;
-#define ENABLE_RX()                  \
-    do {                             \
-        PORTD.OUTSET = PIN1_bm;      \
-        SPI0.CTRLA |= SPI_ENABLE_bm; \
+#define ENABLE_RX()                   \
+    do {                              \
+        /* PORTD.OUTSET = PIN1_bm; */ \
+        SPI0.CTRLA |= SPI_ENABLE_bm;  \
     } while (0)
 #define DISABLE_RX()                  \
     do {                              \
@@ -232,13 +232,13 @@ int main(void)
     /* 受信設定 ---------------------------------------------------------------- */
     // アナログコンパレーターの初期化
     VREF.ACREF = VREF_REFSEL_2V048_gc;
-    AC0.MUXCTRL = AC_INITVAL_HIGH_gc | AC_MUXPOS_AINP0_gc | AC_MUXNEG_DACREF_gc;
-    AC0.DACREF = 44; // Vth = 0.35v
-    AC0.CTRLA = AC_HYSMODE_SMALL_gc | AC_ENABLE_bm;
-    // イベント0にAC0の出力を接続
-    EVSYS.CHANNEL0 = EVSYS_CHANNEL0_AC0_OUT_gc;
-    // イベント0をEVOUTA(PA2)ピンに出力（デバッグ用）
-    EVSYS.USEREVSYSEVOUTA = EVSYS_USER_CHANNEL0_gc;
+    AC1.MUXCTRL = AC_INITVAL_HIGH_gc | AC_MUXPOS_AINP0_gc | AC_MUXNEG_DACREF_gc;
+    AC1.DACREF = 44; // Vth = 0.35v
+    AC1.CTRLA = AC_HYSMODE_SMALL_gc | AC_ENABLE_bm;
+    // イベント0にAC1の出力を接続
+    EVSYS.CHANNEL0 = EVSYS_CHANNEL0_AC1_OUT_gc;
+    // イベント0をEVOUTC(PC2)ピンに出力（デバッグ用）
+    EVSYS.USEREVSYSEVOUTC = EVSYS_USER_CHANNEL0_gc;
 
     // // イベント0をTCB1の入力に設定
     // EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL0_gc;
@@ -252,17 +252,17 @@ int main(void)
     // // イベント1をTCB1の出力に設定
     // EVSYS.CHANNEL1 = EVSYS_CHANNEL1_TCB1_CAPT_gc;
 
-    // イベント0をTCB2の入力に設定
-    EVSYS.USERTCB2CAPT = EVSYS_USER_CHANNEL0_gc;
-    // TCB2を2usのワンショットに設定
-    PORTC.DIRSET = PIN0_bm;
-    TCB2.CTRLB = TCB_ASYNC_bm | TCB_CCMPEN_bm | TCB_CNTMODE_SINGLE_gc; // PC0ピンに出力
-    TCB2.EVCTRL = TCB_EDGE_bm | TCB_CAPTEI_bm;
-    TCB2.CNT = 48;
-    TCB2.CCMP = 48;
-    TCB2.CTRLA = TCB_ENABLE_bm;
-    // TCB2出力をイベント1へ
-    EVSYS.CHANNEL1 = EVSYS_CHANNEL1_TCB2_CAPT_gc;
+    // イベント0をTCB0の入力に設定
+    EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL0_gc;
+    // TCB0を2usのワンショットに設定
+    PORTA.DIRSET = PIN2_bm;
+    TCB0.CTRLB = TCB_ASYNC_bm | TCB_CCMPEN_bm | TCB_CNTMODE_SINGLE_gc; // PC0ピンに出力
+    TCB0.EVCTRL = TCB_EDGE_bm | TCB_CAPTEI_bm;
+    TCB0.CNT = 48;
+    TCB0.CCMP = 48;
+    TCB0.CTRLA = TCB_ENABLE_bm;
+    // TCB0出力をイベント1へ
+    EVSYS.CHANNEL1 = EVSYS_CHANNEL1_TCB0_CAPT_gc;
 
     // CCL LUTの2と3をD-FFに設定
     CCL.SEQCTRL1 = CCL_SEQSEL_DFF_gc;
@@ -281,7 +281,7 @@ int main(void)
     // EVEVT2をCCL LUT2の出力（D-FFの出力）に設定
     EVSYS.CHANNEL2 = EVSYS_CHANNEL2_CCL_LUT2_gc;
     // イベント2をEVOUTC(PC2)ピンへ出力（デバッグ用）
-    EVSYS.USEREVSYSEVOUTC = EVSYS_USER_CHANNEL2_gc;
+    // EVSYS.USEREVSYSEVOUTC = EVSYS_USER_CHANNEL2_gc;
 
     // CCL LUT3（D-FFのゲート）は常に1出力
     CCL.TRUTH3 = 0xFF;
@@ -303,16 +303,16 @@ int main(void)
     CCL.LUT0CTRLA = CCL_CLKSRC_CLKPER_gc | CCL_OUTEN_bm | CCL_ENABLE_bm;
 
     // 通信の終わり検知用タイマー
-    // イベント0をTCB0の入力に設定
-    EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL0_gc;
+    // イベント0をTCB1の入力に設定
+    EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL0_gc;
     // 割り込み有効
-    TCB0.EVCTRL = TCB_CAPTEI_bm;
-    TCB0.INTCTRL = TCB_CAPT_bm;
+    TCB1.EVCTRL = TCB_CAPTEI_bm;
+    TCB1.INTCTRL = TCB_CAPT_bm;
     // 1bitぶんの時間以上の適当な時間
-    TCB0.CCMP = 100;
+    TCB1.CCMP = 100;
     // タイムアウトモード
-    TCB0.CTRLB = TCB_CNTMODE_TIMEOUT_gc;
-    TCB0.CTRLA = TCB_CLKSEL_DIV2_gc | TCB_ENABLE_bm; // オーバーフロー割り込みの頻度低減のためDIV2
+    TCB1.CTRLB = TCB_CNTMODE_TIMEOUT_gc;
+    TCB1.CTRLA = TCB_CLKSEL_DIV2_gc | TCB_ENABLE_bm; // オーバーフロー割り込みの頻度低減のためDIV2
 
     // SPIの設定
     SPI0.CTRLA = SPI_ENABLE_bm;
@@ -320,9 +320,9 @@ int main(void)
     SPI0.CTRLA = SPI_ENABLE_bm;
     SPI0.INTCTRL = SPI_RXCIE_bm | SPI_IE_bm;
 
-    PORTC.DIRSET = PIN1_bm; // SS（デバッグ用）
-    PORTC.OUTSET = PIN1_bm;
-    PORTC.OUTCLR = PIN1_bm;
+    // PORTC.DIRSET = PIN1_bm; // SS（デバッグ用）
+    // PORTC.OUTSET = PIN1_bm;
+    // PORTC.OUTCLR = PIN1_bm;
     /* 受信設定ここまで --------------------------------------------------------- */
 
     /* 送信設定 ---------------------------------------------------------------- */
@@ -400,7 +400,7 @@ ISR(SPI0_INT_vect)
     SPI0.INTFLAGS = SPI_RXCIF_bm;
 }
 
-ISR(TCB0_INT_vect)
+ISR(TCB1_INT_vect)
 {
     uint8_t count;
     count = 0;
@@ -410,8 +410,8 @@ ISR(TCB0_INT_vect)
         // 8ビットに満たない部分的データを受信
         while (!(SPI0.INTFLAGS & SPI_RXCIF_bm)) {
             // PC0(TCB2 OUT)はPA6(SPI0 SCK)に接続してあるのでSCKをトグル
-            PORTC.PIN0CTRL = PORT_INVEN_bm;
-            PORTC.PIN0CTRL = 0;
+            PORTA.PIN2CTRL = PORT_INVEN_bm;
+            PORTA.PIN2CTRL = 0;
             _delay_us(1); // delay入れてないとINTFLAGSが立つのが間に合わない（別になくても動作に影響はない）
             count++;
         }
@@ -433,5 +433,5 @@ ISR(TCB0_INT_vect)
     SPI0.INTCTRL = SPI_RXCIE_bm | SPI_IE_bm;
     len = 0;
 
-    TCB0.INTFLAGS |= TCB_CAPT_bm;
+    TCB1.INTFLAGS |= TCB_CAPT_bm;
 }
