@@ -182,10 +182,10 @@ void pd_phy_send(uint8_t *data, uint_fast8_t len)
 
     USART2.STATUS = USART_TXCIF_bm;
 
-    USART2.TXDATAL = 0xff;
+    // USART2.TXDATAL = 0xff;
     USART2.TXDATAL = ~0x2d;
 
-    _delay_us(13);
+    _delay_us(1);
     ENABLE_TX();
 
     // Send Preamble
