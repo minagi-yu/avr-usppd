@@ -41,6 +41,62 @@ enum k_code {
 static uint16_t len;
 static volatile uint16_t msgid;
 
+static struct pd_packet {
+    uint8_t sop[4];
+    uint8_t message[(16 + (32 * 8)) / 8];
+    uint32_t crc;
+} pd_packet;
+
+static bool reset_signal;
+static uint_fast8_t shift = 0;
+
+enum pd_phy_decode_state {
+    SOP_DETECT,
+    SOP_DECODE,
+    MSG_DECODE,
+    EOP_DECODE,
+};
+
+static enum pd_phy_decode_state state;
+
+static void
+pd_recv(uint8_t d)
+{
+    static uint8_t od;
+    static uint_fast8_t numsop;
+    // len++;
+    switch (state) {
+        case SOP_DETECT:
+            for (shift = 0; shift < 8; shift++) {
+                uint8_t tmp = (d << (8 - shift)) | (od >> shift);
+                tmp &= 0xf8;
+                if (tmp == 0xc0) { // Sync-1
+                    reset_signal = false;
+                    break;
+                }
+                if (tmp == 0x38) { // RST-1
+                    reset_signal = true;
+                    break;
+                }
+            }
+            numsop = 0;
+            /* Falls through. */
+        case SOP_DECODE:
+            pd_packet.sop[numsop++] = (d << (8 - shift)) | (od >> shift);
+            if (numsop > 3) {
+                state = MSG_DECODE;
+            }
+            break;
+        case MSG_DECODE:
+            break;
+        case EOP_DECODE:
+            break;
+        default:
+            break;
+    }
+    od = d;
+}
+
 static int uart_putchar(char c, FILE *stream)
 {
     uart_putc(c);
